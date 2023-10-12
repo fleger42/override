@@ -1,0 +1,54 @@
+# We have a executable "level0" lets do some test!
+
+>level0@RainFall:~$ ./level0
+Segmentation fault (core dumped)
+>level0@RainFall:~$ ./level0 test
+No !
+>level0@RainFall:~$ ./level0 test test
+No !
+
+# OK! Now lets deep dive into the code !
+
+>gdb level0
+(gdb)disas main
+[...]
+    0x08048ec6 <+6>:	sub    $0x20,%esp
+    0x08048ec9 <+9>:	mov    0xc(%ebp),%eax
+    0x08048ecc <+12>:	add    $0x4,%eax
+    0x08048ecf <+15>:	mov    (%eax),%eax
+    0x08048ed1 <+17>:	mov    %eax,(%esp)
+    0x08048ed4 <+20>:	call   0x8049710 <atoi>
+    0x08048ed9 <+25>:	cmp    $0x1a7,%eax
+    0x08048ede <+30>:	jne    0x8048f58 <main+152>
+[...]
+
+# This chunk is interesting at +9 and +12 it move the first argmunent to eax
+
+# Then it call atoi on the eax value at +20 and compare the return value to 0x1a7
+
+# 0x1a7 is the hexadecimal value for 423 and if its not equal we jump to the instruction +152
+
+# But if we do not jump the program will call execv (see below)!
+
+[...]
+    0x08048f4a <+138>:	movl   $0x80c5348,(%esp)
+    0x08048f51 <+145>:	call   0x8054640 <execv>
+[...]
+
+# Let's try this outside of gdb !
+
+level0@RainFall:~$ ./level0 423
+$ 
+$ ls
+ls: cannot open directory .: Permission denied
+$ whoami
+level1
+$ 
+
+# We did it! Now lets cat the password of level1 and we are done with this level
+
+$ cd ..
+$ cd level1
+$ cat .pass
+1fe8a524fa4bec01ca4ea2a869af2a02260d4a7d5fe7e7c24d8617e6dca12d3a
+

