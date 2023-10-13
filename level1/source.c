@@ -1,19 +1,37 @@
-#include <stdlib.h>
-#include <unistd.h>
-#include <stdio.h>
-
-void run(void)
-
+_BOOL4 verify_user_name()
 {
-  fwrite("Good... Wait what?\n",1,19,stdout);
-  system("/bin/sh");
-  return;
+  puts("verifying username....\n");
+  return memcmp(a_user_name, "dat_wil", 7u) != 0;
 }
 
-int main(int ac, char **av, char **envp)
+//----- (080484A3) --------------------------------------------------------
+_BOOL4 __cdecl verify_user_pass(const void *a1)
 {
-    char str[76];
+  return memcmp(a1, "admin", 5u) != 0;
+}
 
-    gets(str);
-    return;
+//----- (080484D0) --------------------------------------------------------
+int __cdecl main(int argc, const char **argv, const char **envp)
+{
+  char s[64]; // [esp+1Ch] [ebp-4Ch] BYREF
+  _BOOL4 v5; // [esp+5Ch] [ebp-Ch]
+
+  memset(s, 0, sizeof(s));
+  v5 = 0;
+  puts("********* ADMIN LOGIN PROMPT *********");
+  printf("Enter Username: ");
+  fgets(a_user_name, 256, stdin);
+  v5 = verify_user_name();
+  if ( v5 )
+  {
+    puts("nope, incorrect username...\n");
+  }
+  else
+  {
+    puts("Enter Password: ");
+    fgets(s, 100, stdin);
+    v5 = verify_user_pass(s);
+    puts("nope, incorrect password...\n");
+  }
+  return 1;
 }
