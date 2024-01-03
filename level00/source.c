@@ -1,13 +1,16 @@
-int __cdecl main(int argc, const char **argv, const char **envp)
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(void)
 {
-  int v4; // [esp+1Ch] [ebp-4h] BYREF
+  int pass;
 
   puts("***********************************");
   puts("* \t     -Level00 -\t\t  *");
   puts("***********************************");
   printf("Password:");
-  __isoc99_scanf("%d", &v4);
-  if ( v4 == 5276 )
+  scanf("%d", &pass);
+  if ( pass == 5276 )
   {
     puts("\nAuthenticated!");
     system("/bin/sh");
