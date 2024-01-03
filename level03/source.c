@@ -1,10 +1,15 @@
-int __cdecl decrypt(char a1)
-{
-  unsigned int i; // [esp+20h] [ebp-28h]
-  unsigned int v3; // [esp+24h] [ebp-24h]
-  char v4[29]; // [esp+2Bh] [ebp-1Dh] BYREF
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
 
-  *(_DWORD *)&v4[17] = __readgsdword(0x14u);
+int decrypt(char a1)
+{
+  unsigned int i;
+  unsigned int v3;
+  char v4[29];
+
+  v4[17] = *(int *)(in_GS_OFFSET + 0x14);
   strcpy(v4, "Q}|u`sfg~sf{}|a3");
   v3 = strlen(v4);
   for ( i = 0; i < v3; ++i )
@@ -14,13 +19,11 @@ int __cdecl decrypt(char a1)
   else
     return puts("\nInvalid Password");
 }
-// 8048746: positive sp value 4 has been found
 
-//----- (08048747) --------------------------------------------------------
-int __cdecl test(int a1, int a2)
+int test(int a1, int a2)
 {
-  int result; // eax
-  char v3; // al
+  int result;
+  char v3;
 
   switch ( a2 - a1 )
   {
@@ -49,11 +52,10 @@ int __cdecl test(int a1, int a2)
   return result;
 }
 
-//----- (0804885A) --------------------------------------------------------
-int __cdecl main(int argc, const char **argv, const char **envp)
+int main(int argc, const char **argv, const char **envp)
 {
-  unsigned int v3; // eax
-  int savedregs; // [esp+20h] [ebp+0h] BYREF
+  unsigned int v3;
+  int savedregs;
 
   v3 = time(0);
   srand(v3);
@@ -61,7 +63,7 @@ int __cdecl main(int argc, const char **argv, const char **envp)
   puts("*\t\tlevel03\t\t**");
   puts("***********************************");
   printf("Password:");
-  __isoc99_scanf("%d", &savedregs);
+  scanf("%d", &savedregs);
   test(savedregs, 322424845);
   return 0;
 }
