@@ -1,13 +1,19 @@
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/ptrace.h>
+#include <sys/prctl.h>
 
-//----- (080486C8) --------------------------------------------------------
-int __cdecl main(int argc, const char **argv, const char **envp)
+int main(int argc, const char **argv, const char **envp)
 {
-  int stat_loc; // [esp+1Ch] [ebp-9Ch] BYREF
-  char s[128]; // [esp+20h] [ebp-98h] BYREF
-  int v6; // [esp+A0h] [ebp-18h]
-  int v7; // [esp+A4h] [ebp-14h]
-  int v8; // [esp+A8h] [ebp-10h]
-  __pid_t v9; // [esp+ACh] [ebp-Ch]
+  int stat_loc;
+  char s[128];
+  int v6;
+  int v7;
+  int v8;
+  __pid_t v9;
 
   v9 = fork();
   memset(s, 0, sizeof(s));
