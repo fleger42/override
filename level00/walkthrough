@@ -1,1 +1,11 @@
-./level00 5276
+First, we look at dogbolt and see that it is comparing our input with 5276 (see source.c). If we enter the if, the program than launch /bin/sh
+
+level00@OverRide:~$ ./level00
+***********************************
+* 	     -Level00 -		  *
+***********************************
+Password:5276
+
+Authenticated!
+$ whoami
+level01

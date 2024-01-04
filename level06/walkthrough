@@ -1,0 +1,42 @@
+We can see that the proram take 2 input, a login and a serial. It than call auth function.
+Using dogbolt, we can analyze auth to discover that login is transformed by multiple operation and than compared to serial.
+To exploit this binary, we want login to be equal to serial after being transformed.
+
+We can create a new program by copy pasting the auth function:
+
+#include <string.h>
+#include <stdio.h>
+
+int main()
+{
+    char old_string[] = "terminate";
+    int new_string;
+
+    old_string[strcspn(old_string, "\n")] = 0;
+
+        new_string = (old_string[3] ^ 0x1337) + 6221293;
+        for ( int i = 0; i < strnlen(old_string, 32); ++i )
+        {
+        if ( old_string[i] <= 31 )
+            return 1;
+        new_string += (new_string ^ (unsigned int)old_string[i]) % 0x539;
+        }
+    printf("%d", new_string);
+}
+
+We can put any string we want, for example "terminate". We just want to get a serial number that is working.
+
+$ ./a.out 
+6235795 
+
+level06@OverRide:~$ ./level06 
+***********************************
+*		level06		  *
+***********************************
+-> Enter Login: terminate
+***********************************
+***** NEW ACCOUNT DETECTED ********
+***********************************
+-> Enter Serial: 6235795
+Authenticated!
+$ 

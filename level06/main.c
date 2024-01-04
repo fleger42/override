@@ -3,9 +3,8 @@
 
 int main()
 {
-
-        char old_string[] = "terminate";
-    int new_string; // [esp+18h] [ebp-10h]
+    char old_string[] = "terminate";
+    int new_string;
 
     old_string[strcspn(old_string, "\n")] = 0;
 

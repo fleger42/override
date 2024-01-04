@@ -29,7 +29,7 @@ _BOOL4 __cdecl auth(char *login, int serial)
 int __cdecl main(int argc, const char **argv, const char **envp)
 {
   int serial;
-  char login[28];
+  char login[32];
 
   puts("***********************************");
   puts("*\t\tlevel06\t\t  *");
