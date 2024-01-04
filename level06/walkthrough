@@ -1,4 +1,4 @@
-We can see that the proram take 2 input, a login and a serial. It than call auth function.
+We can see that the program take 2 input, a login and a serial. It than call auth function.
 Using dogbolt, we can analyze auth to discover that login is transformed by multiple operation and than compared to serial.
 To exploit this binary, we want login to be equal to serial after being transformed.
 
