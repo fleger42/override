@@ -1,34 +1,63 @@
-#include <stdlib.h>
-#include <unistd.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+void log_wrapper(FILE *a1, const char *a2, const char *a3)
+{
+  char dest[264];
+
+  strcpy(dest, a2);
+  snprintf(&dest[strlen(dest)], 254 - strlen(dest), a3);
+  dest[strcspn(dest, "\n")] = 0;
+  fprintf(a1, "LOG: %s\n", dest);
+  return ;
+}
 
 int main(int argc, const char **argv, const char **envp)
 {
-  char s[32];
+  FILE *v4;
+  FILE *stream;
+  int fd;
+  char buf;
+  char dest[104];
 
+  buf = -1;
+  if ( argc != 2 )
+    printf("Usage: %s filename\n", *argv);
+  v4 = fopen("./backups/.log", "w");
+  if ( !v4 )
+  {
+    printf("ERROR: Failed to open %s\n", "./backups/.log");
+    exit(1);
+  }
+  log_wrapper(v4, "Starting back up: ", argv[1]);
+  stream = fopen(argv[1], "r");
+  if ( !stream )
+  {
+    printf("ERROR: Failed to open %s\n", argv[1]);
+    exit(1);
+  }
+  strcpy(dest, "./backups/");
+  strncat(dest, argv[1], 99 - strlen(dest));
+  fd = open(dest, 193, 432LL);
+  if ( fd < 0 )
+  {
+    printf("ERROR: Failed to open %s%s\n", "./backups/", argv[1]);
+    exit(1);
+  }
   while ( 1 )
   {
-    printf("%p, %p \n", auth, service);
-    if ( !fgets(s, 128, stdin) )
+    buf = fgetc(stream);
+    if ( buf == -1 )
       break;
-    if ( !memcmp(s, "auth ", 5u) )
-    {
-      auth = (char *)malloc(4u);
-      if ( strlen(s + 5) <= 30 )
-        strcpy(auth, s + 5);
-    }
-    if ( !memcmp(s, "reset", 5u) )
-      free(auth);
-    if ( !memcmp(s, "service", 6u) )
-      service = (int)strdup(s + 6);
-    if ( !memcmp(s, "login", 5u) )
-    {
-      if (auth[8] == 0)
-        fwrite("Password:\n", 1, 10, stdout);
-      else
-        system("/bin/sh");
-    }
+    write(fd, &buf, 1uLL);
   }
+  log_wrapper(v4, "Finished back up ", argv[1]);
+  fclose(stream);
+  close(fd);
   return 0;
 }
