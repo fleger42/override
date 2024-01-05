@@ -1,6 +1,11 @@
-_BOOL4 __cdecl auth(char *login, int serial)
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <sys/ptrace.h>
+
+int auth(char *login, int serial)
 {
-  int new_string; // [esp+18h] [ebp-10h]
+  int new_string;
 
   login[strcspn(login, "\n")] = 0;
 
@@ -26,7 +31,7 @@ _BOOL4 __cdecl auth(char *login, int serial)
   }
 }
 
-int __cdecl main(int argc, const char **argv, const char **envp)
+int main(int argc, const char **argv, const char **envp)
 {
   int serial;
   char login[32];
@@ -35,12 +40,12 @@ int __cdecl main(int argc, const char **argv, const char **envp)
   puts("*\t\tlevel06\t\t  *");
   puts("***********************************");
   printf("-> Enter Login: ");
-  fgets(login, 32, stdin);
+  fgets(login, 32, 0);
   puts("***********************************");
   puts("***** NEW ACCOUNT DETECTED ********");
   puts("***********************************");
   printf("-> Enter Serial: ");
-  scanf(&unk_8048A60, &serial);
+  scanf("%d", &serial);
   if ( auth(login, serial) )
     return 1;
   puts("Authenticated!");
