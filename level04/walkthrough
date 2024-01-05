@@ -6,7 +6,7 @@ The idea here is to do the following:
 
 payload = offset + address of system() + return address for system() + address of "/bin/sh"
 
-Since we do a buffer overload, we will overwrite EIP, and put our payload instead. The code will than launch system with sh as parameter.
+Since we do a buffer overload, we will overwrite EIP (0xffffcfbc - 0xffffcf20 = 156), and put our payload instead. The code will than launch system with sh as parameter.
 
 
 find __libc_start_main, +99999999, "/bin/sh"
