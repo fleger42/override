@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-int main(int argc, const char **argv, const char **envp)
+int main(void)
 {
   char s[100];
   unsigned int i;
